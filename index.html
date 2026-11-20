@@ -69,6 +69,7 @@ a{color:var(--accent)}
 .icon-btn{width:44px;height:44px;border:0;background:transparent;border-radius:12px;display:grid;place-items:center;color:var(--ink-2)}
 .icon-btn:active{background:var(--surface-2)}
 .icon-btn svg{width:22px;height:22px}
+html.hide-amt input.num[inputmode="decimal"]:not(:focus){-webkit-text-security:disc;text-security:disc}
 
 /* tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
@@ -224,6 +225,7 @@ details.more summary::-webkit-details-marker{display:none}
     <div class="brand">LIFE DESIGN<small>資産管理・人生設計（試作品）</small></div>
     <div class="sp"></div>
     <span id="saveStatus" class="chip-status">読み込み中…</span>
+    <button class="icon-btn" id="hideBtn" data-act="hide-toggle" aria-label="金額を隠す" aria-pressed="false"></button>
     <button class="icon-btn" data-act="go" data-to="ai" aria-label="AI ADVISOR">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M9 10h.01M12 10h.01M15 10h.01"/></svg>
     </button>
@@ -995,7 +997,7 @@ function lsGet(){ try{ var s=localStorage.getItem(LS_KEY); return s?JSON.parse(s
 function lsSet(v){ try{ localStorage.setItem(LS_KEY, JSON.stringify(v)); return true; }catch(e){ return false; } }
 
 function initStore(){
-  if(PWA_BUILD){ store.mode='local'; store.error=null; var v0=lsGet(); S=v0?migrate(v0):null; setStatus('この端末に保存'); render(); return; }
+  if(PWA_BUILD){ store.mode='local'; store.error=null; var v0=lsGet(); S=v0?migrate(v0):null; setStatus('端末に保存'); render(); return; }
   var finished=false;
   var t=setTimeout(function(){ if(!finished){ finished=true; fallback('クラウド保存に接続できません'); } }, 10000);
   var cl = window.claude && window.claude.use ? window.claude.use : null;
@@ -1043,7 +1045,7 @@ function fallback(msg){
 function save(reason){
   if(!S) return;
   S.meta = S.meta||{}; S.meta.rev=(S.meta.rev||0)+1; S.meta.updatedAt=new Date().toISOString(); S.meta.by=TAB_ID;
-  if(store.mode==='local'||store.mode==='error'||!store.ref){ lsSet(S); if(store.mode==='local') setStatus(PWA_BUILD?'この端末に保存済み':'この端末のみ（保存済み）', !PWA_BUILD); return; }
+  if(store.mode==='local'||store.mode==='error'||!store.ref){ lsSet(S); if(store.mode==='local') setStatus(PWA_BUILD?'保存済み':'この端末のみ（保存済み）', !PWA_BUILD); return; }
   clearTimeout(store.timer);
   setStatus('保存中…');
   store.timer=setTimeout(flush, 700);
@@ -1188,22 +1190,25 @@ function demoState(){
  * 表示ユーティリティ
  * ========================================================= */
 function esc(s){ return String(s===null||s===undefined?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-function yen(v){ if(v===null||v===undefined||isNaN(v)) return '−'; return Math.round(v).toLocaleString('ja-JP')+'円'; }
+/* 金額の表示・非表示（この端末だけの設定。データは変わらない） */
+var HIDE=false; try{ HIDE=localStorage.getItem('ld-hide')==='1'; }catch(e){}
+var MASK='＊＊＊';
+function yen(v){ if(v===null||v===undefined||isNaN(v)) return '−'; if(HIDE) return MASK+'円'; return Math.round(v).toLocaleString('ja-JP')+'円'; }
 /* 表示単位：千円（既定）または万円。設定で切替 */
 /* 表示単位：円（既定）・千円・万円。設定で切替 */
 function dispUnit(){ return (S&&S.display&&S.display.unit)||'yen'; }
 function dispMan(){ return dispUnit()==='man'; }
 function DUV(){ return unitMul(dispUnit()); }
 function UL(){ return unitLabel(dispUnit()); }
-function man(v, dec){ if(v===null||v===undefined||isNaN(v)) return '−'; var x=v/DUV(); dec=dec===undefined?(dispMan()&&Math.abs(x)<100?1:0):(dispMan()?dec:0); return x.toLocaleString('ja-JP',{minimumFractionDigits:dec,maximumFractionDigits:dec})+UL(); }
-function manN(v){ if(v===null||v===undefined||isNaN(v)) return '−'; var x=v/DUV(); return x.toLocaleString('ja-JP',{maximumFractionDigits:dispMan()&&Math.abs(x)<100?1:0}); }
-function axisFmt(v){ var a=Math.abs(v); if(a>=1e8) return (v/1e8).toLocaleString('ja-JP',{maximumFractionDigits:1})+'億'; if(a>=1e4) return (v/1e4).toLocaleString('ja-JP',{maximumFractionDigits:0})+'万'; return String(Math.round(v)); }
+function man(v, dec){ if(v===null||v===undefined||isNaN(v)) return '−'; if(HIDE) return MASK+UL(); var x=v/DUV(); dec=dec===undefined?(dispMan()&&Math.abs(x)<100?1:0):(dispMan()?dec:0); return x.toLocaleString('ja-JP',{minimumFractionDigits:dec,maximumFractionDigits:dec})+UL(); }
+function manN(v){ if(v===null||v===undefined||isNaN(v)) return '−'; if(HIDE) return MASK; var x=v/DUV(); return x.toLocaleString('ja-JP',{maximumFractionDigits:dispMan()&&Math.abs(x)<100?1:0}); }
+function axisFmt(v){ if(HIDE) return ''; var a=Math.abs(v); if(a>=1e8) return (v/1e8).toLocaleString('ja-JP',{maximumFractionDigits:1})+'億'; if(a>=1e4) return (v/1e4).toLocaleString('ja-JP',{maximumFractionDigits:0})+'万'; return String(Math.round(v)); }
 function signed(v, f){ if(v===null||v===undefined||isNaN(v)) return '−'; f=f||man; return (v>0?'＋':v<0?'−':'±')+f(Math.abs(v)); }
 function pct(v, d){ if(v===null||v===undefined||isNaN(v)) return '−'; return (v*100).toFixed(d===undefined?1:d)+'%'; }
 function spct(v){ if(v===null||v===undefined||isNaN(v)) return '−'; return (v>0?'＋':v<0?'−':'±')+Math.abs(v*100).toFixed(1)+'%'; }
 function cls(v){ return v>0?'up':v<0?'down':''; }
 function ymLabel(ym){ return ym? (E.ymYear(ym)+'年'+E.ymMonth(ym)+'月') : '−'; }
-function usd(v){ return v===null||v===undefined||isNaN(v)?'−':'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function usd(v){ return v===null||v===undefined||isNaN(v)?'−':HIDE?'$'+MASK:'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function toHalf(s){ return String(s).replace(/[０-９．，－]/g,function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); }).replace(/ー/g,'-'); }
 function parseNum(s){ if(s===null||s===undefined) return null; s=toHalf(s).replace(/[,\s円万%$]/g,''); if(s===''||s==='-') return null; var n=+s; return isNaN(n)?null:n; }
 function unitMul(unit){ return unit==='man'?MAN:unit==='sen'?1000:1; }
@@ -2136,7 +2141,7 @@ function renderPgfOut(){
   if(fxs.every(function(f){return Math.abs(f-s.fx)>1e-9;})) fxs.push(s.fx);
   rates.sort(function(a,b){return a-b;}); fxs.sort(function(a,b){return a-b;});
   h+='<div class="card"><h2>20年後の円換算額：年率 × 為替の早見表（'+UL()+'）</h2><div class="tbl-wrap"><table class="t num"><thead><tr><th>年率＼為替</th>'+fxs.map(function(f){return '<th'+(Math.abs(f-s.fx)<1e-9?' class="hl"':'')+'>'+f+'円</th>';}).join('')+'</tr></thead><tbody>'+
-    rates.map(function(r){ return '<tr><td'+(Math.abs(r-s.rate)<1e-9?' class="hl"':'')+'>'+pct(r,1)+'</td>'+fxs.map(function(f){ var on=Math.abs(r-s.rate)<1e-9&&Math.abs(f-s.fx)<1e-9; return '<td'+(on?' class="hl" style="font-weight:700"':'')+'>'+(E.pgfTableUsd(c.principalUsd,r,20)*f/DUV()).toLocaleString('ja-JP',{minimumFractionDigits:dispMan()?1:0,maximumFractionDigits:dispMan()?1:0})+'</td>'; }).join('')+'</tr>'; }).join('')+
+    rates.map(function(r){ return '<tr><td'+(Math.abs(r-s.rate)<1e-9?' class="hl"':'')+'>'+pct(r,1)+'</td>'+fxs.map(function(f){ var on=Math.abs(r-s.rate)<1e-9&&Math.abs(f-s.fx)<1e-9; return '<td'+(on?' class="hl" style="font-weight:700"':'')+'>'+(HIDE?MASK:(E.pgfTableUsd(c.principalUsd,r,20)*f/DUV()).toLocaleString('ja-JP',{minimumFractionDigits:dispMan()?1:0,maximumFractionDigits:dispMan()?1:0}))+'</td>'; }).join('')+'</tr>'; }).join('')+
     '</tbody></table></div><p class="sub">為替は一定（変化率0）として計算。</p></div>';
   h+='<div class="note warn">年率や為替を変えた試算は、利用者が設定した仮定に基づく概算です。保険会社が将来の積立利率や受取額を保証するものではありません。契約の積立利率を使った場合も、実際の解約返戻金は保険関係費用・為替手数料・解約控除・市場価格調整などの影響で、この試算と一致しません。</div>';
   host.innerHTML=h;
@@ -2813,6 +2818,7 @@ document.addEventListener('click', function(ev){
     case 'ai-clear': ui.ai=[]; render(); break;
     case 'ai-whatif': try{ ui.wi.changes=JSON.parse(el.getAttribute('data-c')); }catch(e){} ui.futureTab='whatif'; go('future'); break;
     case 'export-json': download('LIFE_DESIGN_backup_'+new Date().toISOString().slice(0,10)+'.json', JSON.stringify(S,null,1)); break;
+    case 'hide-toggle': HIDE=!HIDE; try{ localStorage.setItem('ld-hide',HIDE?'1':'0'); }catch(e){} applyHide(); render(); toast(HIDE?'金額を隠しました':'金額を表示しました'); break;
     case 'theme': var v=el.getAttribute('data-v'); if(v) document.documentElement.setAttribute('data-theme',v); else document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('ld-theme',v); }catch(e){} render(); break;
     case 'reset-demo': confirmSheet('テストデータを入れ直す','現在のデータをすべて架空のテストデータで置き換えます。必要なら先にJSONで保存してください。','置き換える',function(){ var rev=S.meta.rev; S=demoState(); S.meta.rev=rev; audit('架空のテストデータを入れ直し','全体'); save(); go('home'); }, true); break;
     case 'reset-all': confirmSheet('すべて削除','すべてのデータを削除して最初の画面に戻ります。元に戻せません。','すべて削除',function(){
@@ -2930,6 +2936,13 @@ function importJson(file){
 
 window.LDApp={ state:function(){ return S; }, demo:demoState, engine:E }; // 検証用（読み取り）
 /* 起動 */
+function applyHide(){
+  document.documentElement.classList.toggle('hide-amt',HIDE);
+  var b=document.getElementById('hideBtn'); if(!b) return;
+  b.setAttribute('aria-pressed',String(HIDE)); b.setAttribute('aria-label',HIDE?'金額を表示する':'金額を隠す'); b.title=HIDE?'金額を表示する':'金額を隠す';
+  b.innerHTML=HIDE?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.8 9.8 0 0 1 12 5c6 0 9.5 7 9.5 7a16 16 0 0 1-3.1 3.9M6.6 6.6A16 16 0 0 0 2.5 12s3.5 7 9.5 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+applyHide();
 try{ var th=localStorage.getItem('ld-theme'); if(th) document.documentElement.setAttribute('data-theme',th); }catch(e){}
 var h0=location.hash.replace('#',''); if(ROUTES.indexOf(h0)>=0) ui.route=h0;
 render();

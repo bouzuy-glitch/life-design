@@ -1,5 +1,5 @@
 // LIFE DESIGN オフライン対応（アプリのファイルだけを保存。資産データは扱わない）
-const CACHE = 'life-design-0.5.0-de577a93';
+const CACHE = 'life-design-0.5.0-3400a52b';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
